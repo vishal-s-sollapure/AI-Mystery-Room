@@ -49,7 +49,8 @@ export function HomePage({
   const [caseLength, setCaseLength] = useState<CaseLength>('standard');
   const [category, setCategory] = useState<string>('theft');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingStep, setLoadingStep] = useState('Consulting police archives...');
+  const [loadingStep, setLoadingStep] = useState('Consulting AI archives...');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const preview = difficultyPreviews[difficulty];
@@ -66,6 +67,7 @@ export function HomePage({
 
     setError(null);
     setIsGenerating(true);
+    setElapsedSeconds(0);
     setLoadingStep('Consulting AI archives...');
 
     const stepInterval = setInterval(() => {
@@ -75,7 +77,11 @@ export function HomePage({
         if (prev.includes('Cataloging')) return 'Cross-referencing decisive evidence and motive...';
         return 'Securing case dossier and opening room...';
       });
-    }, 3000);
+    }, 2500);
+
+    const timerInterval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
 
     try {
       const created = await api.createCase({
@@ -85,9 +91,11 @@ export function HomePage({
         category,
       });
       clearInterval(stepInterval);
+      clearInterval(timerInterval);
       onCaseCreated(created);
     } catch (err: any) {
       clearInterval(stepInterval);
+      clearInterval(timerInterval);
       setIsGenerating(false);
       setError(err.message || 'Failed to generate mystery case. Please try again.');
     }
@@ -292,21 +300,40 @@ export function HomePage({
 
       {isGenerating && (
         <div className="loading-overlay">
-          <div className="loader-content">
+          <div className="loader-content" style={{ maxWidth: 460, textAlign: 'center' }}>
             <div className="spinner" />
             <p className="eyebrow" style={{ color: '#c39453', margin: '0 0 8px' }}>
               CASE DOSSIER IN GENERATION
             </p>
-            <h3 style={{ font: '500 24px Fraunces, serif', color: '#f5ebdd', margin: 0 }}>
+            <h3 style={{ font: '500 24px Fraunces, serif', color: '#f5ebdd', margin: '0 0 12px' }}>
               {loadingStep}
             </h3>
-            <p style={{ color: '#9d9487', fontSize: 12, marginTop: 8 }}>
-              Validating timeline consistency and clue references before opening the room.
+            
+            <div style={{
+              width: '100%',
+              height: 4,
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: 2,
+              overflow: 'hidden',
+              margin: '12px 0 8px',
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(95, Math.max(10, (elapsedSeconds / 10) * 100))}%`,
+                background: 'linear-gradient(90deg, #c39453, #e8be78)',
+                borderRadius: 2,
+                transition: 'width 0.4s ease-out'
+              }} />
+            </div>
+
+            <p style={{ color: '#9d9487', fontSize: 12, margin: '6px 0 0' }}>
+              Validating forensic clues and timeline records ({elapsedSeconds}s · ~8–12s typical)
             </p>
+
             <button
               type="button"
               className="ghost"
-              style={{ marginTop: 16, fontSize: 11 }}
+              style={{ marginTop: 18, fontSize: 11 }}
               onClick={() => setIsGenerating(false)}
             >
               Cancel

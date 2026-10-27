@@ -205,41 +205,40 @@ CRITICAL EXACT COUNTS:
 - Solution: culpritId MUST be one of the suspects. decisiveClueIds MUST be 1-2 clue IDs proving the crime.
 - Keep descriptions clear, evocative, and under 30 words each so clues are punchy and readable.`;
 
-    // Candidate models to try in order of speed and current availability
+    // Only query active, supported models in order of speed
     const candidateModels = Array.from(
       new Set([
+        this.primaryModel || 'gemini-3.5-flash-lite',
         'gemini-3.5-flash-lite',
-        this.primaryModel,
-        'gemini-3-flash-preview',
-        'gemini-3.5-flash',
+        'gemini-3.8-flash',
       ])
-    );
+    ).filter(Boolean);
 
     let lastError: Error | null = null;
 
     for (const modelName of candidateModels) {
       try {
-        console.log(`Requesting mystery generation from model: ${modelName}...`);
+        console.log(`[GeminiService] Requesting generation from model: ${modelName}...`);
         const startTime = Date.now();
 
-        // 15-second timeout per attempt to avoid hanging user for minutes
+        // 10-second timeout per attempt to keep game creation responsive
         const resultPromise = this.ai.models.generateContent({
           model: modelName,
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
             responseJsonSchema: detailedResponseSchema as never,
-            temperature: 0.4,
+            temperature: 0.3,
           },
         });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout after 15s on ${modelName}`)), 15000)
+          setTimeout(() => reject(new Error(`Timeout after 10s on ${modelName}`)), 10000)
         );
 
         const response = await Promise.race([resultPromise, timeoutPromise]);
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`Generation succeeded with ${modelName} in ${elapsed}s`);
+        console.log(`[GeminiService] Succeeded with ${modelName} in ${elapsed}s`);
 
         const rawText = response.text?.trim() || '{}';
         const parsed = JSON.parse(rawText);
@@ -249,14 +248,13 @@ CRITICAL EXACT COUNTS:
         return validated;
       } catch (err: any) {
         lastError = err;
-        console.warn(`Model ${modelName} failed or timed out (${err.message}). Trying fallback...`);
+        console.warn(`[GeminiService] Model ${modelName} attempt failed (${err.message}).`);
       }
     }
 
-    // If all models failed or Google's API is returning 503 across the board,
-    // construct a high-quality procedural narrative matching the user's exact premise
-    // per SPEC §2.2 / §4.2 so the user never gets an error or broken game.
-    console.warn('All Gemini models unavailable; generating fallback procedural dossier...');
+    // If Gemini models fail or time out, instantly provide a high-quality procedural narrative
+    // matching the user's exact premise so the user never waits more than 10-15s or gets an error
+    console.warn('[GeminiService] All Gemini attempts exceeded threshold; providing procedural case...');
     return this.createProceduralFallback(options, rules);
   }
 
