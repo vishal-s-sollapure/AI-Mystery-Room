@@ -1,18 +1,60 @@
 # AI Mystery Room
 
-An AI-assisted fictional detective game. Create a case, investigate the evidence, and make one final accusation.
+An AI-powered fictional detective game built with React, Vite, Node.js, Express, MongoDB Atlas, and the official Google Gemini SDK (`@google/genai`).
 
-## Start locally
+Investigate forensic evidence, interview suspects, track timelines, request tactical hints, and submit your final accusation.
 
-1. Copy `.env.example` to `server/.env` and provide a MongoDB URI, Gemini API key/model, and a 32+ character session secret.
-2. Run `npm install` from the repository root.
-3. Run `npm run dev`.
-4. Open `http://localhost:5173`.
+---
 
-The client includes a fully playable demonstration case while the live case screens are being connected. The API persists generated mysteries, suspects, evidence, and investigation sessions in MongoDB. Gemini runs only on the server and must be configured before `POST /api/v1/mysteries` can generate a live case.
+## Authoritative Difficulty & Rules
 
-## Structure
+| Difficulty | Suspects | Clues | Hints | Correct Accusation Base Points |
+| :--- | :--- | :--- | :--- | :--- |
+| **Easy** | 3 | 5 | 2 | 100 |
+| **Medium** | 4 | 7 | 3 | 150 |
+| **Hard** | 5 | 9 | 3 | 200 |
 
-- `client/` — React/Vite investigation experience.
-- `server/` — Express API, request validation, ownership cookie and safe DTOs.
-- `docs/` — architecture and API contracts.
+### Score Formula
+$$\text{Score} = \max\left(0, \text{basePoints} + (\text{discoveredClues} \times 5) - (\text{hintsUsed} \times 10)\right)$$
+
+---
+
+## Quick Start Locally
+
+### 1. Configure Environment
+Ensure `.env` exists in the repository root:
+```env
+NODE_ENV=development
+PORT=5000
+CLIENT_ORIGIN=http://localhost:5173
+MONGODB_URI=your_mongodb_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+SESSION_SECRET=a_long_random_secret_at_least_32_characters
+```
+
+### 2. Install & Run
+```bash
+# Install dependencies across workspaces
+npm install
+
+# Start both backend API (port 5000) and frontend (port 5173)
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## Verification & Testing
+
+```bash
+# Typecheck TypeScript across all workspaces
+npm run typecheck
+
+# Run automated unit and integration tests (Scoring, DTOs, Mystery Lifecycle)
+npm test
+
+# Build production bundles
+npm run build
+```

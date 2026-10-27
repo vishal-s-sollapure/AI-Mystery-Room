@@ -68,12 +68,14 @@ export function HomePage({
     setIsGenerating(true);
     setLoadingStep('Consulting AI archives...');
 
-    const timer1 = setTimeout(() => {
-      setLoadingStep('Profiling suspects and examining alibis...');
-    }, 2500);
-    const timer2 = setTimeout(() => {
-      setLoadingStep('Cataloging forensic clues and timeline records...');
-    }, 5500);
+    const stepInterval = setInterval(() => {
+      setLoadingStep((prev) => {
+        if (prev.includes('Consulting')) return 'Profiling suspects and examining alibis...';
+        if (prev.includes('Profiling')) return 'Cataloging forensic clues and timeline records...';
+        if (prev.includes('Cataloging')) return 'Cross-referencing decisive evidence and motive...';
+        return 'Securing case dossier and opening room...';
+      });
+    }, 3000);
 
     try {
       const created = await api.createCase({
@@ -82,12 +84,10 @@ export function HomePage({
         caseLength,
         category,
       });
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      clearInterval(stepInterval);
       onCaseCreated(created);
     } catch (err: any) {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      clearInterval(stepInterval);
       setIsGenerating(false);
       setError(err.message || 'Failed to generate mystery case. Please try again.');
     }
@@ -303,6 +303,14 @@ export function HomePage({
             <p style={{ color: '#9d9487', fontSize: 12, marginTop: 8 }}>
               Validating timeline consistency and clue references before opening the room.
             </p>
+            <button
+              type="button"
+              className="ghost"
+              style={{ marginTop: 16, fontSize: 11 }}
+              onClick={() => setIsGenerating(false)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

@@ -368,7 +368,9 @@ export function InvestigationPage({
                   </span>
                   {clue.timestamp && <time>{clue.timestamp}</time>}
                   {clue.isDiscovered ? (
-                    <Check size={16} style={{ color: '#8ec982' }} title="Analyzed Clue" />
+                    <span title="Analyzed Clue" style={{ display: 'inline-flex' }}>
+                      <Check size={16} style={{ color: '#8ec982' }} />
+                    </span>
                   ) : (
                     <span style={{ font: '9px "DM Mono", monospace', color: '#c39453', border: '1px dashed #7a5a3a', padding: '1px 4px' }}>
                       SEALED
