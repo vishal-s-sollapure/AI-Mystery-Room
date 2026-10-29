@@ -82,6 +82,14 @@ const progressSchema = new Schema(
     hintsUsed: { type: Number, default: 0 },
     revealedHintIds: [{ type: String }],
     notes: { type: String, default: '' },
+    lastHintIdempotencyKey: { type: String },
+    lastAccuseIdempotencyKey: { type: String },
+    lastHintReturned: {
+      id: { type: String },
+      order: { type: Number },
+      text: { type: String },
+      type: { type: String },
+    },
     accusation: {
       suspectId: { type: String },
       isCorrect: { type: Boolean },

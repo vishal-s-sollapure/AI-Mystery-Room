@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
+import { env } from '../config/env.js';
 import {
   CaseLength,
   Difficulty,
@@ -184,26 +185,32 @@ const detailedResponseSchema = {
 export class GeminiService {
   private ai: GoogleGenAI;
   private primaryModel: string;
+  private timeoutMs: number;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, timeoutMs: number = env.GEMINI_TIMEOUT_MS || 25000) {
     this.ai = new GoogleGenAI({ apiKey });
     this.primaryModel = model;
+    this.timeoutMs = timeoutMs;
   }
 
   async generate(options: GenerateOptions): Promise<GeneratedMystery> {
     const rules = DIFFICULTY_RULES[options.difficulty];
     const isExtended = options.caseLength === 'extended';
 
+    const lengthGuidance = isExtended
+      ? `- Case Length: EXTENDED. Provide an atmospheric, multi-layered story with in-depth suspect profiles, detailed forensic clue content (35-65 words each), and rich contextual timeline events.`
+      : `- Case Length: STANDARD. Provide a concise, focused mystery brief with compact, punchy clue descriptions (20-35 words each).`;
+
     const prompt = `You are a master detective game author. Create an airtight, fictional ${options.category} mystery.
 Premise: "${options.premise}".
+${lengthGuidance}
 
-CRITICAL EXACT COUNTS:
+CRITICAL EXACT COUNTS (Do not alter counts regardless of case length):
 - Suspects: EXACTLY ${rules.suspects} suspects (id: s1 to s${rules.suspects}).
 - Clues: EXACTLY ${rules.clues} clues (id: c1 to c${rules.clues}). Teasers: 1-sentence previews. Content: full forensic detail.
 - Hints: EXACTLY ${rules.hints} hints (id: h1 to h${rules.hints}, order 1 to ${rules.hints}). Types: ${rules.hints === 2 ? 'h1=nudge, h2=connection' : 'h1=nudge, h2=connection, h3=deduction'}.
 - Timeline: 3-5 events (id: t1, t2...).
-- Solution: culpritId MUST be one of the suspects. decisiveClueIds MUST be 1-2 clue IDs proving the crime.
-- Keep descriptions clear, evocative, and under 30 words each so clues are punchy and readable.`;
+- Solution: culpritId MUST be one of the suspects. decisiveClueIds MUST be 1-2 clue IDs proving the crime. All clues and timeline events must be internally consistent.`;
 
     // Only query active, supported models in order of speed
     const candidateModels = Array.from(
@@ -221,7 +228,6 @@ CRITICAL EXACT COUNTS:
         console.log(`[GeminiService] Requesting generation from model: ${modelName}...`);
         const startTime = Date.now();
 
-        // 10-second timeout per attempt to keep game creation responsive
         const resultPromise = this.ai.models.generateContent({
           model: modelName,
           contents: prompt,
@@ -233,7 +239,10 @@ CRITICAL EXACT COUNTS:
         });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout after 10s on ${modelName}`)), 10000)
+          setTimeout(
+            () => reject(new Error(`Timeout after ${this.timeoutMs}ms on ${modelName}`)),
+            this.timeoutMs
+          )
         );
 
         const response = await Promise.race([resultPromise, timeoutPromise]);
@@ -252,13 +261,13 @@ CRITICAL EXACT COUNTS:
       }
     }
 
-    // If Gemini models fail or time out, instantly provide a high-quality procedural narrative
-    // matching the user's exact premise so the user never waits more than 10-15s or gets an error
+    // If Gemini models fail or time out, provide a high-quality procedural narrative
+    // matching the user's exact premise and caseLength
     console.warn('[GeminiService] All Gemini attempts exceeded threshold; providing procedural case...');
     return this.createProceduralFallback(options, rules);
   }
 
-  private verifyIntegrity(
+  verifyIntegrity(
     mystery: GeneratedMystery,
     rules: { suspects: number; clues: number; hints: number }
   ) {
@@ -276,15 +285,16 @@ CRITICAL EXACT COUNTS:
     const clueIds = new Set(mystery.clues.map((c) => c.id));
 
     if (!suspectIds.has(mystery.solution.culpritId)) {
-      mystery.solution.culpritId = mystery.suspects[0].id;
+      throw new Error(`Solution references invalid culpritId '${mystery.solution.culpritId}'`);
     }
 
-    mystery.solution.decisiveClueIds = mystery.solution.decisiveClueIds.filter((id) =>
+    const validDecisive = mystery.solution.decisiveClueIds.filter((id) =>
       clueIds.has(id)
     );
-    if (mystery.solution.decisiveClueIds.length === 0) {
-      mystery.solution.decisiveClueIds = [mystery.clues[0].id];
+    if (validDecisive.length === 0) {
+      throw new Error(`Solution decisiveClueIds must contain at least one valid clue ID`);
     }
+    mystery.solution.decisiveClueIds = validDecisive;
   }
 
   private createProceduralFallback(
@@ -474,9 +484,14 @@ CRITICAL EXACT COUNTS:
       { id: 't5', timestamp: '21:49', description: 'Asset discovered missing; building locked down.', relatedSuspectIds: [], relatedClueIds: [] },
     ];
 
+    const isExtended = options.caseLength === 'extended';
+    const story = isExtended
+      ? `A high-stakes incident unfolded during the evening: ${options.premise}. The executive board ordered an immediate perimeter lockdown as contradictory testimonies emerged from primary keyholders. Forensic personnel have secured electronic access logs, physical evidence bags, and surveillance reels to reconstruct the exact sequence of events.`
+      : `An unexplained incident occurred under mysterious circumstances: ${options.premise}. The investigation center has secured the area, gathered forensic records, and questioned all key individuals present.`;
+
     return {
       title,
-      story: `An unexplained incident occurred under mysterious circumstances: ${options.premise}. The investigation center has secured the area, gathered forensic records, and questioned all key individuals present.`,
+      story,
       setting: 'The Grand Met Exhibition Facility',
       incidentSummary: options.premise,
       suspects,

@@ -34,6 +34,15 @@ export const api = {
   // Health check
   checkHealth: () => request<{ status: string; database: string }>('/health'),
 
+  // Auth / Session
+  getSession: () =>
+    request<{
+      ownerId: string;
+      badgeNumber: string;
+      isGuest: boolean;
+      status: string;
+    }>('/auth/session'),
+
   // Cases
   createCase: (data: {
     premise: string;
@@ -51,9 +60,10 @@ export const api = {
       method: 'POST',
     }),
 
-  requestHint: (caseId: string) =>
+  requestHint: (caseId: string, idempotencyKey?: string) =>
     request<{ hint: Hint; caseState: PublicCase }>(`/cases/${caseId}/hints`, {
       method: 'POST',
+      body: JSON.stringify({ idempotencyKey }),
     }),
 
   saveNotes: (caseId: string, notes: string) =>
@@ -62,10 +72,10 @@ export const api = {
       body: JSON.stringify({ notes }),
     }),
 
-  submitAccusation: (caseId: string, suspectId: string) =>
+  submitAccusation: (caseId: string, suspectId: string, idempotencyKey?: string) =>
     request<ResultData>(`/cases/${caseId}/accuse`, {
       method: 'POST',
-      body: JSON.stringify({ suspectId }),
+      body: JSON.stringify({ suspectId, idempotencyKey }),
     }),
 
   getResult: (caseId: string) => request<ResultData>(`/cases/${caseId}/result`),

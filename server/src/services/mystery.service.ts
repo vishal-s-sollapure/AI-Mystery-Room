@@ -115,12 +115,25 @@ export class MysteryService {
 
   async requestHint(
     ownerId: string,
-    caseId: string
+    caseId: string,
+    idempotencyKey?: string
   ): Promise<{ hint: PublicHintDto; caseState: PublicCaseDto }> {
     const doc = await this.findOwnedCase(ownerId, caseId);
 
     if (doc.status === 'completed') {
       throw new AppError('CASE_ALREADY_COMPLETED', 'Case has already been completed', 400);
+    }
+
+    // Idempotency check: if the client retries with the same key, return the same hint without charging twice
+    if (
+      idempotencyKey &&
+      doc.progress.lastHintIdempotencyKey === idempotencyKey &&
+      doc.progress.lastHintReturned
+    ) {
+      return {
+        hint: doc.progress.lastHintReturned,
+        caseState: toPublicCaseDto(doc),
+      };
     }
 
     const rule = DIFFICULTY_RULES[doc.difficulty];
@@ -139,19 +152,26 @@ export class MysteryService {
       throw new AppError('HINTS_EXHAUSTED', 'No further hints available in case.', 409);
     }
 
-    if (!doc.progress.revealedHintIds.includes(nextHint.id)) {
-      doc.progress.revealedHintIds.push(nextHint.id);
-      doc.progress.hintsUsed += 1;
-      await doc.save();
-    }
-
-    const caseState = toPublicCaseDto(doc);
     const hintDto: PublicHintDto = {
       id: nextHint.id,
       order: nextHint.order,
       text: nextHint.text,
       type: nextHint.type,
     };
+
+    if (!doc.progress.revealedHintIds.includes(nextHint.id)) {
+      doc.progress.revealedHintIds.push(nextHint.id);
+      doc.progress.hintsUsed += 1;
+    }
+
+    if (idempotencyKey) {
+      doc.progress.lastHintIdempotencyKey = idempotencyKey;
+      doc.progress.lastHintReturned = hintDto;
+    }
+
+    await doc.save();
+
+    const caseState = toPublicCaseDto(doc);
 
     return {
       hint: hintDto,
@@ -173,12 +193,21 @@ export class MysteryService {
   async accuse(
     ownerId: string,
     caseId: string,
-    suspectId: string
+    suspectId: string,
+    idempotencyKey?: string
   ): Promise<ResultDto> {
     const doc = await this.findOwnedCase(ownerId, caseId);
 
     // If case already completed, return existing result (idempotency per FR-068)
     if (doc.status === 'completed' && doc.progress.accusation) {
+      return toResultDto(doc);
+    }
+
+    if (
+      idempotencyKey &&
+      doc.progress.lastAccuseIdempotencyKey === idempotencyKey &&
+      doc.progress.accusation
+    ) {
       return toResultDto(doc);
     }
 
@@ -204,6 +233,9 @@ export class MysteryService {
       isCorrect,
       submittedAt: new Date(),
     };
+    if (idempotencyKey) {
+      doc.progress.lastAccuseIdempotencyKey = idempotencyKey;
+    }
     doc.progress.score = scoreResult.finalScore;
     doc.progress.status = 'completed';
     doc.status = 'completed';

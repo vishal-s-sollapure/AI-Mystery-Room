@@ -3,6 +3,7 @@ import {
   accuseSchema,
   createCaseSchema,
   notesSchema,
+  requestHintSchema,
 } from '../schemas/api.schema.js';
 import { GeminiService } from '../services/gemini.service.js';
 import { MysteryService } from '../services/mystery.service.js';
@@ -62,7 +63,12 @@ caseRouter.post('/:id/clues/:clueId/discover', async (req, res, next) => {
 // POST /api/cases/:id/hints - Request the next available hint
 caseRouter.post('/:id/hints', async (req, res, next) => {
   try {
-    const result = await mysteryService.requestHint(req.ownerId, req.params.id);
+    const input = requestHintSchema.parse(req.body || {});
+    const result = await mysteryService.requestHint(
+      req.ownerId,
+      req.params.id,
+      input.idempotencyKey
+    );
     return ok(res, result);
   } catch (error) {
     next(error);
@@ -91,7 +97,8 @@ caseRouter.post('/:id/accuse', async (req, res, next) => {
     const result = await mysteryService.accuse(
       req.ownerId,
       req.params.id,
-      input.suspectId
+      input.suspectId,
+      input.idempotencyKey
     );
     return ok(res, result);
   } catch (error) {

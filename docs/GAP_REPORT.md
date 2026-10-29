@@ -1,69 +1,49 @@
-# AI Mystery Room — Phase 1: Repository Audit & Gap Report
+# AI Mystery Room — Phase 1: Comprehensive Repository Audit & Gap Report
 
-**Audit Date:** 2026-10-27  
-**Specification:** [SPEC.md](file:///c:/Users/VISHAL/OneDrive/Desktop/AI%20Mystery%20Room/SPEC.md) (v1.1.0)  
-**Status:** Phase 1 Complete
+**Audit Date:** 2026-10-29  
+**Specification Reference:** [SPEC.md](file:///c:/Users/VISHAL/OneDrive/Desktop/AI%20Mystery%20Room/SPEC.md) (v1.1.0)  
+**Status:** Phase 1 Complete (Baseline Verified, Gap Matrix & Implementation Plan Updated)
 
 ---
 
-## 1. Feature-by-Feature Gap Matrix
+## 1. Executive Summary
 
-| Feature / Requirement | Current State in Repository | SPEC.md v1.1.0 & Prompt Requirement | Gap Severity | Action Plan |
+A comprehensive audit was performed across all frontend components, backend controllers, data models, validation schemas, scoring logic, test suites, and environment settings.
+
+The project currently has a working MERN baseline with an Express backend, MongoDB persistence, and a dark cinematic React frontend. However, several critical gaps and production hardening requirements must be completed to satisfy `SPEC.md` and user requirements:
+
+1. **Gemini Model & Timeout Optimization**: Google Gemini has deprecated `gemini-2.5-flash` ("no longer available to new users"). `gemini-3.5-flash-lite` is fully verified and functional. However, the current generation timeout of 10s is too short under network load, causing unnecessary fallbacks. The prompt also does not yet distinguish narrative depth between `standard` and `extended` case lengths.
+2. **Idempotency & Request Protection**: `idempotencyKey` schemas exist in `api.schema.ts`, but are not yet tracked in the database or handled in `mysteryService.requestHint` and `accuse` to prevent duplicate penalties or double submissions on retries.
+3. **Suspect Profile Completeness**: Section 6 requires displaying connected evidence items and related timeline events within suspect profiles. Currently, the suspect modal only shows basic biographical text.
+4. **Evidence Presentation & Honest Media Fallbacks**: Evidence types (`chat`, `access_log`, `video`, `document`, `statement`, `physical`, `lab_note`) should have specialized thematic styling, explicit fictional AI labels, and honest visual placeholders (no fake video controls or broken links). Discovery status filtering ("All", "Discovered", "Sealed") is also needed.
+5. **Sign In & Investigator Session Navigation**: The landing page navigation requires "How It Works, My Cases, and Sign In navigation" (SPEC §1.1, §4.7 & Prompt §2, §10). A secure server-issued session is already active via `amr_guest` cookies; a dedicated Investigator Session / Sign In modal and navigation control will expose session status, allow badge viewing, and maintain strict guest ownership.
+6. **Accusation Safety & Confirmation**: A two-step explicit confirmation modal with an irreversible-warning acknowledgment is needed before submitting accusations.
+7. **Comprehensive Test Suite**: The 15 test categories specified in Section 13 must be thoroughly implemented, verified, and automated.
+
+---
+
+## 2. Feature-by-Feature Gap Matrix
+
+| Feature / Requirement | Current Implementation State | SPEC.md v1.1.0 & Prompt Requirement | Gap Severity | Action Plan |
 | :--- | :--- | :--- | :--- | :--- |
-| **API Route Structure** | `/api/v1/mysteries` routes in `server.ts` | Base `/api` with `/api/health`, `/api/cases`, `/api/cases/:id`, `/api/cases/:id/clues/:clueId/discover`, `/api/cases/:id/hints`, `/api/cases/:id/accuse`, `/api/cases/:id/result`, `/api/cases/:id/notes`, `/api/my-cases` | **High** | Implement clean REST router adhering to exact specification contracts. |
-| **Data Architecture** | 4 separate collections (`Mystery`, `Suspect`, `Evidence`, `InvestigationSession`) | Single unified `MysteryCase` document with embedded `suspects`, `clues`, `hints`, `timeline`, `solution`, `progress` | **High** | Migrate to unified embedded Mongoose schema per SPEC §7.1. Enables atomic state transitions, eliminates multi-collection sync bugs. |
-| **Mystery Generation** | Basic prototype generating suspects and evidence; missing hints; evidence counts not strictly aligned | Strict counts: Easy (3s/5c/2h), Medium (4s/7c/3h), Hard (5s/9c/3h). Standard vs Extended case length support. Structured hints (nudge, connection, deduction). | **High** | Enhance Gemini generator with structured JSON schema, caseLength handling, clue teaser/content separation, ordered hints, and bounded retries. |
-| **Clue Discovery Mechanism** | Evidence returned all at once; no server-side discovery state or score tie-in | Teaser visible before discovery; full content returned only upon discovery POST; idempotent discovery; 5 pts per distinct clue | **High** | Implement `POST /api/cases/:id/clues/:clueId/discover` with content redaction on case get and point accumulation. |
-| **Hints & Penalties** | No hint generation or endpoints exist | Ordered hints, server-enforced limits, -10 pts per successful hint, idempotency keys | **High** | Implement `POST /api/cases/:id/hints` with atomic penalty deduction and progression. |
-| **Scoring Engine** | Non-existent | Server-only calculation: `max(0, basePoints + 5*clues - 10*hints)` with 0-floor and full breakdown | **High** | Implement pure scoring service with comprehensive unit tests. |
-| **Accusation & Verdict** | Simple check in prototype, missing decisive clue details, why misleading was misleading, score breakdown | Comprehensive accusation evaluation, solution reveal (motive, method, opportunity, explanation, decisive clues), atomic status transition to `completed` | **High** | Implement `POST /api/cases/:id/accuse` and `GET /api/cases/:id/result`. |
-| **Investigator Notes** | UI-only mock notes; patched on session in old prototype | Server-persisted notes with autosave, validation, and restore upon refresh/case load | **Medium** | Implement notes persistence in case progress. |
-| **My Cases & Resumption** | Endpoint `/api/v1/mysteries` existed but frontend did not call it | Full My Cases drawer/modal or page listing active & completed cases with metadata, score, and resume link | **Medium** | Connect frontend to `/api/cases` list, allow seamless case switching and resume. |
-| **Frontend Architecture** | Single static file (`client/src/main.tsx`) with hardcoded mock case ("The Ashford Relic") | Modular multi-page application with real API client, routing (`/`, `/create`, `/cases/:id`, `/cases/:id/investigate`, `/cases/:id/accuse`, `/cases/:id/result`, `/how-to-play`), responsive panels/tabs | **Critical** | Build modular React application preserving the dark cinematic detective aesthetic. |
-| **Testing Suite** | No test scripts or automated tests in repository | Unit, integration, and E2E tests covering generation, scoring, clue discovery, hint limits, solution redaction, ownership | **Critical** | Install Vitest + Supertest, write full test suite for server and scoring. |
-| **Security & Privacy** | Solutions returned in some responses or partially redacted | Strict redaction of `solution`, `culpritId`, and undiscovered clue contents across all pre-accusation endpoints | **Critical** | Create Zod DTO transformers ensuring zero solution leakage. |
+| **1. AI Model & Generation** | `gemini-3.5-flash-lite` configured in `.env`, but hardcoded 10s timeout triggers fallback prematurely. `isExtended` not used in prompt. | Configurable timeout (`GEMINI_TIMEOUT_MS`, default 25s). Distinct prompt styling for `standard` (concise forensic brief) vs `extended` (rich narrative, in-depth testimony). Strict count enforcement (Easy 3s/5c/2h, Medium 4s/7c/3h, Hard 5s/9c/3h). | **High** | Update `gemini.service.ts` prompt and timeout logic. Verify model response times and procedural fallback parity. |
+| **2. Case Length Support** | Standard and Extended UI buttons exist; passed to backend; but generated narrative differences are minimal. | Standard: concise narrative and compact evidence descriptions. Extended: richer narrative, deeper testimony, more detailed timeline, while retaining identical difficulty counts and scoring rules. | **Medium** | Differentiate prompt guidelines and fallback generation for `caseLength`. Add tests for both lengths across all 3 difficulties. |
+| **3. Clue Discovery & Filters** | Clue discovery POST works (+5 pts). Type filter exists. | Add discovery status filter (`All`, `Discovered`, `Sealed`). Ensure repeated clicks never award extra points. Add stylized viewer for each clue type (chat bubbles, access log terminal, evidence bag, surveillance stills) with fictional AI badge. | **Medium** | Enhance `InvestigationPage.tsx` with discovery status toggle and stylized clue views. |
+| **4. Suspect Profiles** | Shows name, role, profile, motive, alibi. | Must also show connected evidence items (clickable) and related timeline events per Prompt §6. | **Medium** | Update suspect profile modal to dynamically list connected clues and chronological events. |
+| **5. Hint Idempotency** | Hints work with -10 pt penalty and limit enforcement. | Client-supplied `idempotencyKey` must be recorded to guarantee network retries do not charge twice. | **Medium** | Add `lastHintIdempotencyKey` tracking in `MysteryCase.progress` and handle in `requestHint`. |
+| **6. Accusation Workflow** | Accusation evaluates culprit, sets completed status, and calculates score. | Add 2-step confirmation with explicit acknowledgment of finality. Support `idempotencyKey`. | **Medium** | Update `AccuseModal.tsx` and `mystery.service.ts` with explicit confirmation and idempotency. |
+| **7. Navigation & Sign In** | "How it works" and "My Cases" present. Guest cookie (`amr_guest`) active. | Add "Sign In / Investigator Session" in navigation. Show active investigator dossier ID and session status. | **Low / Polish** | Add `GET /api/auth/session` endpoint and `SignInModal.tsx` on client. |
+| **8. Automated Tests** | Unit tests for scoring, DTO, and basic service lifecycle pass (24 tests). | Expand tests to cover all 15 required categories: schema validation, unsolvable case rejection, standard/extended for all difficulties, hint idempotency, unauthorized isolation, Gemini errors. | **High** | Add dedicated test suites in `server/src/test/` and run `npm test`. |
+| **9. Production Build & Docs** | Client and server build successfully (`tsc -b && vite build`, `tsc`). | Update `.env.example`, `README.md`, `API.md` with complete architecture, scoring formula, and deployment guidelines. | **Medium** | Update documentation and verify production build. |
 
 ---
 
-## 2. Preserved Assets & Visual Identity
+## 3. Exit Criteria for Phase 1
 
-The existing styles in `client/src/styles.css` provide an authentic, high-quality dark cinematic detective aesthetic:
-- **Palette:** Dark charcoal base (`#0e1114`, `#161a1f`), muted slate borders (`#262c35`), warm ivory text (`#ede8df`, `#b3ab9d`), aged amber/gold highlights (`#d49a3d`, `#e5ab55`), and restrained burgundy seals (`#6b2828`).
-- **Typography:** Playfair/Cinzel style serif headers, clean sans body text, and monospace metadata tags (`CASE FILE`, `CLASSIFIED`, timestamps).
-- **Layout:** Evidence desk feel, inspectable suspect directory, interactive clue viewer, timeline events, and confirmation seals.
-
-We will preserve all of these visual design choices and components, wire them to the live API, add the missing pages/modals (Create Mystery with live counts, Hint Tray, My Cases drawer, How To Play guide, and Accusation Confirmation Modal), and ensure complete responsiveness on mobile devices with tabs/drawers.
-
----
-
-## 3. Plan of Execution (Phases 2–7)
-
-- **Phase 2: Data models, API contracts, validation, security & test setup**
-  - Install Vitest and Supertest in server.
-  - Implement unified `MysteryCase` Mongoose model.
-  - Implement Zod API schemas and public DTO transformers.
-  - Implement guest auth middleware (`amr_guest` cookie).
-  - Implement standard response envelopes and error handling.
-- **Phase 3: Gemini generation, mystery consistency & persistence**
-  - Implement `GeminiService` using `@google/genai`.
-  - Implement prompt engineering with exact difficulty counts (Easy 3/5/2, Medium 4/7/3, Hard 5/9/3) and case lengths (Standard/Extended).
-  - Implement bounded retries and cross-reference validation.
-  - Write unit/mock tests for generation.
-- **Phase 4: Evidence discovery, suspect profiles, notes, timeline & hints**
-  - Implement clue discovery endpoint with full content gating and score update.
-  - Implement ordered hint endpoint with penalty and limit enforcement.
-  - Implement investigator notes autosave.
-  - Write integration tests.
-- **Phase 5: Accusation, results, scoring & My Cases**
-  - Implement pure scoring engine with zero-floor rule.
-  - Implement accusation endpoint with atomic completion and solution reveal.
-  - Implement result retrieval and My Cases listing.
-  - Write tests for scoring and accusation idempotency.
-- **Phase 6: Frontend integration, responsive polish & accessibility**
-  - Implement API client (`/api`) with cookie support.
-  - Implement client routing: Home, Create, Investigation room, Accusation modal, Result page, How to Play, My Cases.
-  - Connect suspect directory, evidence archive, search/filters, clue discovery, hint request, notes autosave, accusation submission.
-  - Ensure mobile responsiveness with tabs/collapsible panels.
-- **Phase 7: Automated testing, bug fixes, production build & verification**
-  - Run `npm test`, `npm run typecheck`, `npm run build`.
-  - Verify complete end-to-end player journey.
+- [x] Read `SPEC.md` and user instructions completely.
+- [x] Full inspection of frontend, backend, models, routes, tests, configuration.
+- [x] Real Gemini API model tested and operational (`gemini-3.5-flash-lite`).
+- [x] Baseline test suite executed and passed (`npm test` — 24 passing tests).
+- [x] Typecheck executed and passed (`npm run typecheck`).
+- [x] Production build executed and passed (`npm run build`).
+- [x] Requirement-to-file implementation plan documented in `docs/IMPLEMENTATION_PLAN.md`.

@@ -63,6 +63,14 @@ export interface Progress {
   hintsUsed: number;
   revealedHintIds: string[];
   notes: string;
+  lastHintIdempotencyKey?: string;
+  lastAccuseIdempotencyKey?: string;
+  lastHintReturned?: {
+    id: string;
+    order: number;
+    text: string;
+    type: string;
+  };
   accusation?: {
     suspectId: string;
     isCorrect: boolean;

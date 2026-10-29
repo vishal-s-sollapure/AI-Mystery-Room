@@ -16,6 +16,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().optional(),
   GEMINI_TEXT_MODEL: z.string().optional(),
+  GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(25000),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
 });
 
@@ -23,7 +24,7 @@ const parsed = envSchema.parse(process.env);
 
 export const env = {
   ...parsed,
-  GEMINI_MODEL: parsed.GEMINI_MODEL || parsed.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+  GEMINI_MODEL: parsed.GEMINI_MODEL || parsed.GEMINI_TEXT_MODEL || 'gemini-3.5-flash-lite',
 };
 
 export type AppEnv = typeof env;

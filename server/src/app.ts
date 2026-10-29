@@ -7,6 +7,7 @@ import { authMiddleware } from './middleware/auth.middleware.js';
 import { errorMiddleware } from './middleware/error.middleware.js';
 import { healthRouter } from './routes/health.routes.js';
 import { caseRouter } from './routes/case.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 
 export function createApp() {
   const app = express();
@@ -53,6 +54,7 @@ export function createApp() {
   // API Routes
   app.use('/api/health', healthRouter);
   app.use('/api/cases', caseRouter);
+  app.use('/api/auth', authRouter);
 
   // Centralized Error Handling
   app.use(errorMiddleware);
