@@ -68,7 +68,7 @@ export function InvestigationPage({
   const [notes, setNotes] = useState(initialCase.progress.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('Saved to Dossier');
-  const notesSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const notesSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clue discovery & hint loading states
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -101,8 +101,8 @@ export function InvestigationPage({
         statusFilter === 'all'
           ? true
           : statusFilter === 'discovered'
-          ? clue.isDiscovered
-          : !clue.isDiscovered;
+            ? clue.isDiscovered
+            : !clue.isDiscovered;
       return matchesSearch && matchesType && matchesStatus;
     });
   }, [caseData.clues, searchQuery, typeFilter, statusFilter]);
@@ -320,9 +320,8 @@ export function InvestigationPage({
             <i>
               <em
                 style={{
-                  width: `${
-                    (caseData.progress.discoveredCount / caseData.progress.totalClues) * 100
-                  }%`,
+                  width: `${(caseData.progress.discoveredCount / caseData.progress.totalClues) * 100
+                    }%`,
                 }}
               />
             </i>
@@ -346,8 +345,8 @@ export function InvestigationPage({
               {isRequestingHint
                 ? 'Deciphering...'
                 : hintsRemaining > 0
-                ? 'Request Hint (-10 pts)'
-                : 'Hints Exhausted'}
+                  ? 'Request Hint (-10 pts)'
+                  : 'Hints Exhausted'}
             </button>
 
             {caseData.revealedHints && caseData.revealedHints.length > 0 && (
@@ -426,9 +425,8 @@ export function InvestigationPage({
                 <button
                   key={clue.id}
                   type="button"
-                  className={`evidence-item ${isSelected ? 'selected' : ''} ${
-                    !clue.isDiscovered ? 'undiscovered-card' : ''
-                  }`}
+                  className={`evidence-item ${isSelected ? 'selected' : ''} ${!clue.isDiscovered ? 'undiscovered-card' : ''
+                    }`}
                   onClick={() => setSelectedClueId(clue.id)}
                 >
                   <span className="evidence-icon">{getClueIcon(clue.type)}</span>
@@ -483,9 +481,8 @@ export function InvestigationPage({
 
                   {currentClue.type === 'access_log' && (
                     <div className="evidence-terminal">
-                      {`[ACCESS CONTROL UNIT v3.2 - ENTRY/EXIT ARCHIVE]\nTIMESTAMP: ${
-                        currentClue.timestamp || '21:00'
-                      }\n` + currentClue.content}
+                      {`[ACCESS CONTROL UNIT v3.2 - ENTRY/EXIT ARCHIVE]\nTIMESTAMP: ${currentClue.timestamp || '21:00'
+                        }\n` + currentClue.content}
                     </div>
                   )}
 
