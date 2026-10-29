@@ -38,3 +38,16 @@
 .loader-content{text-align:center;max-width:400px}
 .spinner{width:36px;height:36px;border:3px solid #3c322a;border-top-color:#c39453;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* --- Themed Forensic Evidence Views --- */
+.ai-disclaimer{display:inline-flex;align-items:center;gap:5px;font:500 9px 'DM Mono',monospace;letter-spacing:1px;color:#c39453;background:#2b2016;border:1px solid #735438;padding:2px 7px;border-radius:2px;margin-bottom:12px}
+.evidence-themed-box{margin:16px 0;background:#181513;border:1px solid #3a3229;border-radius:3px;padding:16px;position:relative}
+.evidence-terminal{background:#0d0f0e;border:1px solid #233527;color:#a8d5a2;font-family:'DM Mono',monospace;font-size:12px;line-height:1.6;padding:14px;border-radius:3px;white-space:pre-wrap}
+.evidence-cctv-frame{background:#0f1113;border:1px solid #303740;padding:16px;position:relative;border-radius:3px}
+.cctv-header{display:flex;justify-content:space-between;font:500 10px 'DM Mono',monospace;color:#7e8b9b;margin-bottom:10px;border-bottom:1px solid #ffffff12;padding-bottom:6px}
+.cctv-still-view{background:#161a1f;border:1px dashed #404b57;padding:24px 16px;text-align:center;margin:8px 0;border-radius:2px}
+.evidence-chat-bubble{background:#1d1815;border-left:3px solid #c39453;padding:12px 14px;border-radius:0 4px 4px 0;margin:8px 0;font-size:13px;line-height:1.6;color:#e8dfd3}
+.connected-clue-card{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:#181513;border:1px solid #3a332a;padding:8px 12px;margin:6px 0;border-radius:2px;color:#d5cbbe;font-size:12px}
+.connected-clue-card:hover{border-color:#b58547;background:#241e18}
+.save-note-btn{font:500 10px 'DM Mono',monospace;padding:3px 8px;background:#2d241c;border:1px solid #5a4533;color:#dcb174;border-radius:2px;cursor:pointer}
+.save-note-btn:hover{background:#413326}

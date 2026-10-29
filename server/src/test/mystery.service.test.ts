@@ -203,39 +203,92 @@ test('MysteryService — Full Lifecycle & Specification Acceptance', async (t) =
   });
 
   await t.test('FR-068: repeated accusation is idempotent and returns existing result', async () => {
-    const repeatResult = await service.accuse(testOwner, createdCaseId, 's1');
+    const repeatResult = await service.accuse(testOwner, createdCaseId, 's1', 'accuse-key-1');
     assert.strictEqual(repeatResult.scoreBreakdown.finalScore, 140);
     assert.strictEqual(repeatResult.verdict.isCorrect, true);
+
+    // Call again with same idempotency key
+    const idempRepeat = await service.accuse(testOwner, createdCaseId, 's1', 'accuse-key-1');
+    assert.strictEqual(idempRepeat.scoreBreakdown.finalScore, 140);
   });
 
-  await t.test('My Cases: lists completed case in user case history', async () => {
-    const cases = await service.listCases(testOwner);
-    assert.strictEqual(cases.length, 1);
-    assert.strictEqual(cases[0].id, createdCaseId);
-    assert.strictEqual(cases[0].status, 'completed');
-    assert.strictEqual(cases[0].score, 140);
-    assert.strictEqual(cases[0].isCorrect, true);
+  await t.test('Hint idempotency: repeated request with same key returns hint without duplicate penalty', async () => {
+    // Create an active fresh case to test hint idempotency
+    const freshCase = await service.createCase(testOwner, {
+      premise: 'A suspicious blackout occurred during a midnight bank delivery.',
+      difficulty: 'medium',
+      category: 'theft',
+      caseLength: 'standard',
+    });
+
+    const idempotencyKey = 'unique-hint-key-xyz';
+    const firstReq = await service.requestHint(testOwner, freshCase.id, idempotencyKey);
+    assert.strictEqual(firstReq.hint.order, 1);
+    assert.strictEqual(firstReq.caseState.progress.hintsUsed, 1);
+
+    // Re-issue request with identical idempotencyKey
+    const secondReq = await service.requestHint(testOwner, freshCase.id, idempotencyKey);
+    assert.strictEqual(secondReq.hint.id, firstReq.hint.id);
+    assert.strictEqual(secondReq.hint.order, 1);
+    // Hints used MUST NOT increment to 2
+    assert.strictEqual(secondReq.caseState.progress.hintsUsed, 1);
   });
 
-  await t.test('Supports Easy and Hard difficulty counts', async () => {
-    const easyCase = await service.createCase(testOwner, {
-      premise: 'A stolen antique watch during a family reunion in the countryside.',
+  await t.test('Accusation with incorrect suspect awards 0 base points but retains clue discovery points', async () => {
+    const freshCase = await service.createCase(testOwner, {
+      premise: 'A missing ledger from a maritime shipping office on the docks.',
       difficulty: 'easy',
       category: 'theft',
       caseLength: 'standard',
     });
-    assert.strictEqual(easyCase.suspects.length, 3);
-    assert.strictEqual(easyCase.clues.length, 5);
-    assert.strictEqual(easyCase.progress.maxHints, 2);
 
-    const hardCase = await service.createCase(testOwner, {
-      premise: 'A high-profile espionage leak from a secure research facility.',
-      difficulty: 'hard',
-      category: 'sabotage',
-      caseLength: 'extended',
-    });
-    assert.strictEqual(hardCase.suspects.length, 5);
-    assert.strictEqual(hardCase.clues.length, 9);
-    assert.strictEqual(hardCase.progress.maxHints, 3);
+    // Discover 2 clues (+10 pts)
+    await service.discoverClue(testOwner, freshCase.id, 'c1');
+    await service.discoverClue(testOwner, freshCase.id, 'c2');
+
+    // s1 is the mock culprit, so accuse s2 (incorrect)
+    const result = await service.accuse(testOwner, freshCase.id, 's2');
+    assert.strictEqual(result.verdict.isCorrect, false);
+    assert.strictEqual(result.scoreBreakdown.basePoints, 0); // 0 base points!
+    assert.strictEqual(result.scoreBreakdown.cluePoints, 10); // 2 * 5 = 10
+    assert.strictEqual(result.scoreBreakdown.hintPenalty, 0);
+    assert.strictEqual(result.scoreBreakdown.finalScore, 10);
+  });
+
+  await t.test('My Cases: lists completed case in user case history', async () => {
+    const cases = await service.listCases(testOwner);
+    assert.ok(cases.length >= 1);
+    const completed = cases.find((c) => c.id === createdCaseId);
+    assert.ok(completed);
+    assert.strictEqual(completed.status, 'completed');
+    assert.strictEqual(completed.score, 140);
+    assert.strictEqual(completed.isCorrect, true);
+  });
+
+  await t.test('Supports all combinations of difficulty and case length with exact counts', async () => {
+    const matrix: { diff: Difficulty; len: 'standard' | 'extended'; suspects: number; clues: number; hints: number }[] = [
+      { diff: 'easy', len: 'standard', suspects: 3, clues: 5, hints: 2 },
+      { diff: 'easy', len: 'extended', suspects: 3, clues: 5, hints: 2 },
+      { diff: 'medium', len: 'standard', suspects: 4, clues: 7, hints: 3 },
+      { diff: 'medium', len: 'extended', suspects: 4, clues: 7, hints: 3 },
+      { diff: 'hard', len: 'standard', suspects: 5, clues: 9, hints: 3 },
+      { diff: 'hard', len: 'extended', suspects: 5, clues: 9, hints: 3 },
+    ];
+
+    for (const item of matrix) {
+      const c = await service.createCase(testOwner, {
+        premise: `A complex case involving ${item.diff} investigation under ${item.len} length.`,
+        difficulty: item.diff,
+        category: 'sabotage',
+        caseLength: item.len,
+      });
+
+      assert.strictEqual(c.difficulty, item.diff);
+      assert.strictEqual(c.caseLength, item.len);
+      assert.strictEqual(c.suspects.length, item.suspects);
+      assert.strictEqual(c.clues.length, item.clues);
+      assert.strictEqual(c.progress.maxHints, item.hints);
+      assert.strictEqual(c.progress.totalClues, item.clues);
+    }
   });
 });

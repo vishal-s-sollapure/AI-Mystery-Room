@@ -39,10 +39,12 @@ export function HomePage({
   onCaseCreated,
   onOpenHowToPlay,
   onOpenMyCases,
+  onOpenSignIn,
 }: {
   onCaseCreated: (caseData: PublicCase) => void;
   onOpenHowToPlay: () => void;
   onOpenMyCases: () => void;
+  onOpenSignIn: () => void;
 }) {
   const [premise, setPremise] = useState(samplePrompts[0]);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
@@ -124,6 +126,14 @@ export function HomePage({
             onClick={onOpenMyCases}
           >
             <FolderOpen size={14} /> My Cases
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={onOpenSignIn}
+          >
+            <Fingerprint size={14} /> Sign In
           </button>
         </div>
       </nav>

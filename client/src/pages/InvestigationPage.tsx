@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
+  Camera,
   Check,
   Clock3,
   FileText,
@@ -10,6 +11,7 @@ import {
   Lightbulb,
   LockKeyhole,
   MessageCircle,
+  Save,
   Search,
   ShieldAlert,
   UserRound,
@@ -53,6 +55,7 @@ export function InvestigationPage({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'discovered' | 'sealed'>('all');
   const [activeTab, setActiveTab] = useState<'evidence' | 'suspects' | 'timeline'>('evidence');
 
   // Modals
@@ -64,6 +67,7 @@ export function InvestigationPage({
   // Notes state
   const [notes, setNotes] = useState(initialCase.progress.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string>('Saved to Dossier');
   const notesSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clue discovery & hint loading states
@@ -93,14 +97,22 @@ export function InvestigationPage({
           .includes(searchQuery.toLowerCase());
       const matchesType =
         typeFilter === 'all' ? true : clue.type.toLowerCase().includes(typeFilter.toLowerCase());
-      return matchesSearch && matchesType;
+      const matchesStatus =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'discovered'
+          ? clue.isDiscovered
+          : !clue.isDiscovered;
+      return matchesSearch && matchesType && matchesStatus;
     });
-  }, [caseData.clues, searchQuery, typeFilter]);
+  }, [caseData.clues, searchQuery, typeFilter, statusFilter]);
 
   // Auto-save notes debounce
   const handleNotesChange = (val: string) => {
+    if (val.length > 10000) return;
     setNotes(val);
     setIsSavingNotes(true);
+    setSaveStatus('Saving changes...');
     if (notesSaveTimeoutRef.current) {
       clearTimeout(notesSaveTimeoutRef.current);
     }
@@ -108,11 +120,28 @@ export function InvestigationPage({
       try {
         await api.saveNotes(caseData.id, val);
         setIsSavingNotes(false);
+        setSaveStatus('Saved to Dossier');
       } catch (err) {
         setIsSavingNotes(false);
+        setSaveStatus('Save Failed');
         showToast('Failed to save notes.');
       }
     }, 1200);
+  };
+
+  const handleManualSaveNotes = async () => {
+    setIsSavingNotes(true);
+    setSaveStatus('Saving changes...');
+    try {
+      await api.saveNotes(caseData.id, notes);
+      setIsSavingNotes(false);
+      setSaveStatus('Saved to Dossier');
+      showToast('Investigator notes saved.');
+    } catch (err) {
+      setIsSavingNotes(false);
+      setSaveStatus('Save Failed');
+      showToast('Failed to save notes.');
+    }
   };
 
   // Discover clue handler
@@ -130,12 +159,13 @@ export function InvestigationPage({
     }
   };
 
-  // Request hint handler
+  // Request hint handler with idempotency
   const handleRequestHint = async () => {
     if (isRequestingHint) return;
     setIsRequestingHint(true);
+    const idempotencyKey = `hint-${caseData.id}-${caseData.progress.hintsUsed + 1}`;
     try {
-      const response = await api.requestHint(caseData.id);
+      const response = await api.requestHint(caseData.id, idempotencyKey);
       setCaseData(response.caseState);
       showToast(`Hint unlocked: ${response.hint.type.toUpperCase()} (-10 points)`);
     } catch (err: any) {
@@ -145,11 +175,12 @@ export function InvestigationPage({
     }
   };
 
-  // Submit accusation handler
+  // Submit accusation handler with idempotency
   const handleSubmitAccusation = async (suspectId: string) => {
     setIsSubmittingAccusation(true);
+    const idempotencyKey = `accuse-${caseData.id}-${suspectId}`;
     try {
-      await api.submitAccusation(caseData.id, suspectId);
+      await api.submitAccusation(caseData.id, suspectId, idempotencyKey);
       setShowAccuseModal(false);
       onCaseResolved(caseData.id);
     } catch (err: any) {
@@ -162,6 +193,24 @@ export function InvestigationPage({
     0,
     caseData.progress.maxHints - caseData.progress.hintsUsed
   );
+
+  // Connected elements for the selected suspect profile
+  const connectedClues = useMemo(() => {
+    if (!selectedSuspect) return [];
+    return caseData.clues.filter((c) => c.relatedSuspectIds.includes(selectedSuspect.id));
+  }, [caseData.clues, selectedSuspect]);
+
+  const connectedTimelineEvents = useMemo(() => {
+    if (!selectedSuspect) return [];
+    return caseData.timeline.filter((e) => e.relatedSuspectIds.includes(selectedSuspect.id));
+  }, [caseData.timeline, selectedSuspect]);
+
+  // Jump from suspect profile directly to an evidence card
+  const handleSelectConnectedClue = (clueId: string) => {
+    setSelectedSuspect(null);
+    setSelectedClueId(clueId);
+    setActiveTab('evidence');
+  };
 
   return (
     <main className="app">
@@ -334,18 +383,39 @@ export function InvestigationPage({
             </label>
           </div>
 
-          {/* Type filters */}
-          <div className="filter-bar">
-            {['all', 'document', 'chat', 'statement', 'access_log', 'physical', 'video'].map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`filter-btn ${typeFilter === t ? 'active' : ''}`}
-                onClick={() => setTypeFilter(t)}
-              >
-                {t.replace('_', ' ').toUpperCase()}
-              </button>
-            ))}
+          {/* Type and Status filters */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '14px 0 16px' }}>
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <span style={{ font: '10px "DM Mono", monospace', color: '#887d70', alignSelf: 'center', marginRight: 4 }}>
+                STATUS:
+              </span>
+              {(['all', 'discovered', 'sealed'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`filter-btn ${statusFilter === s ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {s === 'all' ? 'ALL EVIDENCE' : s === 'discovered' ? 'ANALYZED' : 'SEALED'}
+                </button>
+              ))}
+            </div>
+
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <span style={{ font: '10px "DM Mono", monospace', color: '#887d70', alignSelf: 'center', marginRight: 4 }}>
+                TYPE:
+              </span>
+              {['all', 'document', 'chat', 'statement', 'access_log', 'physical', 'video', 'lab_note'].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`filter-btn ${typeFilter === t ? 'active' : ''}`}
+                  onClick={() => setTypeFilter(t)}
+                >
+                  {t.replace('_', ' ').toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Evidence List Grid */}
@@ -397,15 +467,61 @@ export function InvestigationPage({
 
               {currentClue.isDiscovered ? (
                 <>
-                  <p className="evidence-detail">{currentClue.content}</p>
+                  <div className="ai-disclaimer">
+                    <Fingerprint size={12} /> FICTIONAL AI-GENERATED EVIDENCE
+                  </div>
+
+                  {/* Thematic rendering based on clue type */}
+                  {currentClue.type === 'chat' && (
+                    <div className="evidence-themed-box">
+                      <div style={{ font: '10px "DM Mono", monospace', color: '#c39453', marginBottom: 8 }}>
+                        ENCRYPTED MESSAGING TRANSCRIPT // RECOVERED LOGS
+                      </div>
+                      <div className="evidence-chat-bubble">{currentClue.content}</div>
+                    </div>
+                  )}
+
+                  {currentClue.type === 'access_log' && (
+                    <div className="evidence-terminal">
+                      {`[ACCESS CONTROL UNIT v3.2 - ENTRY/EXIT ARCHIVE]\nTIMESTAMP: ${
+                        currentClue.timestamp || '21:00'
+                      }\n` + currentClue.content}
+                    </div>
+                  )}
+
+                  {currentClue.type === 'video' && (
+                    <div className="evidence-cctv-frame">
+                      <div className="cctv-header">
+                        <span>CCTV CAM-03 SURVEILLANCE STILL // REEL #084</span>
+                        <span>REC: {currentClue.timestamp || '21:30'}</span>
+                      </div>
+                      <div className="cctv-still-view">
+                        <Camera size={28} style={{ color: '#7a899c', marginBottom: 8 }} />
+                        <div style={{ font: '10px "DM Mono", monospace', color: '#97a6b8', letterSpacing: 1 }}>
+                          [STATIC SURVEILLANCE CAPTURE]
+                        </div>
+                      </div>
+                      <p className="evidence-detail" style={{ margin: '8px 0 0' }}>
+                        {currentClue.content}
+                      </p>
+                    </div>
+                  )}
+
+                  {currentClue.type !== 'chat' &&
+                    currentClue.type !== 'access_log' &&
+                    currentClue.type !== 'video' && (
+                      <p className="evidence-detail">{currentClue.content}</p>
+                    )}
+
                   <div className="clue">
                     <ShieldAlert size={18} />
                     <span>
                       <b>Investigator Log:</b> Cross-reference this evidence against suspect statements and timeline logs.
                     </span>
                   </div>
+
                   {currentClue.relatedSuspectIds.length > 0 && (
-                    <div style={{ marginTop: 14, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div style={{ marginTop: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ font: '10px "DM Mono", monospace', color: '#8f8373' }}>
                         RELATED PERSONS OF INTEREST:
                       </span>
@@ -463,14 +579,27 @@ export function InvestigationPage({
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <p className="section-label notes-label">INVESTIGATOR NOTES</p>
-            <span style={{ font: '10px "DM Mono", monospace', color: '#7a7063' }}>
-              {isSavingNotes ? 'Saving...' : 'Saved to Dossier'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ font: '10px "DM Mono", monospace', color: '#7a7063' }}>
+                {saveStatus} ({notes.length}/10000)
+              </span>
+              <button
+                type="button"
+                className="save-note-btn"
+                onClick={handleManualSaveNotes}
+                disabled={isSavingNotes}
+                title="Save notes now"
+              >
+                <Save size={11} style={{ display: 'inline', marginRight: 3 }} />
+                Save
+              </button>
+            </div>
           </div>
           <textarea
             className="notes"
             placeholder="Record contradictions, alibi flaws, or deduction theories..."
             value={notes}
+            maxLength={10000}
             onChange={(e) => handleNotesChange(e.target.value)}
           />
 
@@ -484,11 +613,11 @@ export function InvestigationPage({
         </aside>
       </div>
 
-      {/* Suspect Profile Modal */}
+      {/* Suspect Profile Modal with Connected Clues & Timeline Events */}
       {selectedSuspect && (
         <div className="modal-backdrop" onClick={() => setSelectedSuspect(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button className="close" onClick={() => setSelectedSuspect(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '88vh', overflowY: 'auto' }}>
+            <button className="close" onClick={() => setSelectedSuspect(null)} aria-label="Close modal">
               <X size={18} />
             </button>
             <p className="eyebrow">PERSON OF INTEREST</p>
@@ -498,24 +627,79 @@ export function InvestigationPage({
             </div>
             <p style={{ color: '#d5ccbe', lineHeight: 1.6 }}>{selectedSuspect.profile}</p>
 
-            <div style={{ background: '#171513', border: '1px solid #3c342d', padding: 12, margin: '12px 0' }}>
+            <div style={{ background: '#171513', border: '1px solid #3c342d', padding: 12, margin: '12px 0', borderRadius: 2 }}>
               <b style={{ color: '#e8ba74', display: 'block', fontSize: 12, marginBottom: 3 }}>
                 MOTIVE CONTEXT:
               </b>
               <span style={{ fontSize: 12, color: '#b8ad9e' }}>{selectedSuspect.motiveContext}</span>
             </div>
 
-            <div style={{ background: '#171513', border: '1px solid #3c342d', padding: 12, margin: '12px 0' }}>
+            <div style={{ background: '#171513', border: '1px solid #3c342d', padding: 12, margin: '12px 0', borderRadius: 2 }}>
               <b style={{ color: '#e8ba74', display: 'block', fontSize: 12, marginBottom: 3 }}>
-                STATED ALIBI:
+                STATED ALIBI & STATEMENTS:
               </b>
               <span style={{ fontSize: 12, color: '#b8ad9e' }}>{selectedSuspect.alibi}</span>
             </div>
+
+            {/* Connected Evidence per Prompt §6 */}
+            <div style={{ marginTop: 14 }}>
+              <b style={{ color: '#c39453', display: 'block', font: '500 11px "DM Mono", monospace', marginBottom: 6 }}>
+                CONNECTED EVIDENCE FILES ({connectedClues.length}):
+              </b>
+              {connectedClues.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#746c60', fontStyle: 'italic' }}>
+                  No forensic items currently link directly to this suspect.
+                </div>
+              ) : (
+                connectedClues.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="connected-clue-card"
+                    onClick={() => handleSelectConnectedClue(c.id)}
+                  >
+                    <span>
+                      <b>{c.title}</b> ({c.type.replace('_', ' ')})
+                    </span>
+                    <span style={{ color: c.isDiscovered ? '#8ec982' : '#c39453' }}>
+                      {c.isDiscovered ? 'ANALYZED' : 'SEALED'} →
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Related Timeline Events per Prompt §6 */}
+            {connectedTimelineEvents.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <b style={{ color: '#c39453', display: 'block', font: '500 11px "DM Mono", monospace', marginBottom: 6 }}>
+                  RELATED TIMELINE ENTRIES:
+                </b>
+                {connectedTimelineEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    style={{
+                      background: '#151311',
+                      borderLeft: '2px solid #a8724d',
+                      padding: '6px 10px',
+                      margin: '5px 0',
+                      fontSize: 11,
+                      color: '#c4bcb0',
+                    }}
+                  >
+                    <span style={{ color: '#c39453', fontFamily: '"DM Mono", monospace', marginRight: 6 }}>
+                      {evt.timestamp}:
+                    </span>
+                    {evt.description}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Accusation Modal */}
+      {/* Accusation Modal with 2-step confirmation */}
       {showAccuseModal && (
         <AccuseModal
           suspects={caseData.suspects}

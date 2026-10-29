@@ -6,6 +6,7 @@ import { InvestigationPage } from './pages/InvestigationPage';
 import { ResultPage } from './pages/ResultPage';
 import { HowToPlayModal } from './components/HowToPlayModal';
 import { MyCasesModal } from './components/MyCasesModal';
+import { SignInModal } from './components/SignInModal';
 import './styles.css';
 
 export function App() {
@@ -14,6 +15,7 @@ export function App() {
   const [activeCaseId, setActiveCaseId] = useState<string>('');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showMyCases, setShowMyCases] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
 
   // Sync with browser hash routing for direct links & refresh support
@@ -110,6 +112,7 @@ export function App() {
           onCaseCreated={handleCaseCreated}
           onOpenHowToPlay={() => setShowHowToPlay(true)}
           onOpenMyCases={() => setShowMyCases(true)}
+          onOpenSignIn={() => setShowSignIn(true)}
         />
       )}
 
@@ -136,6 +139,8 @@ export function App() {
           onSelectCase={handleSelectCaseFromModal}
         />
       )}
+
+      {showSignIn && <SignInModal onClose={() => setShowSignIn(false)} />}
     </>
   );
 }
