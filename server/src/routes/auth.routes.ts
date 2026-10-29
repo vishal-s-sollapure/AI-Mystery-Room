@@ -13,3 +13,4 @@ authRouter.get('/session', (req, res) => {
     status: 'ACTIVE_INVESTIGATOR',
   });
 });
+
