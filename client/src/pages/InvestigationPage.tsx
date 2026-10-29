@@ -68,7 +68,7 @@ export function InvestigationPage({
   const [notes, setNotes] = useState(initialCase.progress.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('Saved to Dossier');
-  const notesSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clue discovery & hint loading states
   const [isDiscovering, setIsDiscovering] = useState(false);
