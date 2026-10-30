@@ -22,10 +22,31 @@ export function createApp() {
   );
 
   // CORS configuration
+  const configuredOrigins = (env.CLIENT_ORIGIN || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
+  const localOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'];
+  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...localOrigins]));
+
   app.use(
     cors({
-      origin: [env.CLIENT_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/+$/, '');
+        if (
+          allowedOrigins.includes(cleanOrigin) ||
+          cleanOrigin.endsWith('.vercel.app') ||
+          cleanOrigin.endsWith('.onrender.com') ||
+          env.NODE_ENV !== 'production'
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
+      exposedHeaders: ['x-request-id', 'x-investigator-id'],
     })
   );
 

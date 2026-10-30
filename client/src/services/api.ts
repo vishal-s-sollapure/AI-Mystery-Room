@@ -1,6 +1,11 @@
 import { CaseSummary, Clue, Hint, PublicCase, ResultData } from '../types/case';
 
-const API_BASE = '/api';
+const rawBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+const API_BASE = rawBase
+  ? rawBase.endsWith('/api')
+    ? rawBase
+    : `${rawBase.replace(/\/+$/, '')}/api`
+  : '/api';
 
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
@@ -10,14 +15,22 @@ export class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const storedId = typeof localStorage !== 'undefined' ? localStorage.getItem('amr_investigator_id') : null;
+
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(storedId ? { 'x-investigator-id': storedId } : {}),
       ...options.headers,
     },
   });
+
+  const returnedId = res.headers.get('x-investigator-id');
+  if (returnedId && typeof localStorage !== 'undefined') {
+    localStorage.setItem('amr_investigator_id', returnedId);
+  }
 
   const json = await res.json().catch(() => ({}));
 
@@ -35,13 +48,18 @@ export const api = {
   checkHealth: () => request<{ status: string; database: string }>('/health'),
 
   // Auth / Session
-  getSession: () =>
-    request<{
+  getSession: async () => {
+    const data = await request<{
       ownerId: string;
       badgeNumber: string;
       isGuest: boolean;
       status: string;
-    }>('/auth/session'),
+    }>('/auth/session');
+    if (data?.ownerId && typeof localStorage !== 'undefined') {
+      localStorage.setItem('amr_investigator_id', data.ownerId);
+    }
+    return data;
+  },
 
   // Cases
   createCase: (data: {
