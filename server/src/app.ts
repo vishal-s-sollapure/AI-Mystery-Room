@@ -72,6 +72,17 @@ export function createApp() {
   // Guest authentication middleware
   app.use(authMiddleware);
 
+  // Root welcome / status endpoint
+  app.get('/', (_req, res) => {
+    res.json({
+      name: 'AI Mystery Room API',
+      status: 'online',
+      message: 'Backend API is running and connected.',
+      healthCheck: '/api/health',
+      version: '1.1.0',
+    });
+  });
+
   // API Routes
   app.use('/api/health', healthRouter);
   app.use('/api/cases', caseRouter);
