@@ -6,6 +6,14 @@ Investigate forensic evidence, interview suspects, track timelines, request tact
 
 ---
 
+## 🌐 Live Production Deployments
+
+- **Frontend Game Website:** [https://ai-mystery-room-sqai.vercel.app/](https://ai-mystery-room-sqai.vercel.app/)
+- **Backend API Service:** [https://ai-mystery-room-2-qc7n.onrender.com/](https://ai-mystery-room-2-qc7n.onrender.com/)
+- **API Health Check Endpoint:** [https://ai-mystery-room-2-qc7n.onrender.com/api/health](https://ai-mystery-room-2-qc7n.onrender.com/api/health)
+
+---
+
 ## 1. Authoritative Game Rules & Scoring
 
 | Difficulty | Suspects | Clues | Hints | Correct Accusation Base Points |
