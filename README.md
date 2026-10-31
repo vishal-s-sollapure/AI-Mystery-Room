@@ -1,6 +1,6 @@
 # 🕵️ AI Mystery Room
 
-[![Vercel Deployment](https://img.shields.io/badge/Frontend-Vercel-black?style=for-the-badge&logo=vercel)](https://ai-mystery-room-sqai.vercel.app/)
+[![Vercel Deployment](https://img.shields.io/badge/Frontend-Vercel-black?style=for-the-badge&logo=vercel)](https://ai-mystery-room-8aof.vercel.app/)
 [![Render Deployment](https://img.shields.io/badge/Backend-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://ai-mystery-room-2-qc7n.onrender.com/)
 [![Node Version](https://img.shields.io/badge/Node.js-v18%20|%20v20%20|%20v22-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -16,7 +16,7 @@
 
 | Component | Platform | Live URL | Status |
 | :--- | :--- | :--- | :--- |
-| **Frontend App** | **Vercel** | [https://ai-mystery-room-sqai.vercel.app/](https://ai-mystery-room-sqai.vercel.app/) | ✅ Live |
+| **Frontend App** | **Vercel** | [https://ai-mystery-room-8aof.vercel.app/](https://ai-mystery-room-8aof.vercel.app/) | ✅ Live |
 | **Backend API** | **Render** | [https://ai-mystery-room-2-qc7n.onrender.com/](https://ai-mystery-room-2-qc7n.onrender.com/) | ✅ Live |
 | **Health Check** | **Render** | [https://ai-mystery-room-2-qc7n.onrender.com/api/health](https://ai-mystery-room-2-qc7n.onrender.com/api/health) | `{"status":"ready","database":"connected"}` |
 
@@ -287,7 +287,7 @@ npm run build
    - `NODE_ENV`: `production`
    - `MONGODB_URI`: `mongodb+srv://<user>:<password>@cluster.mongodb.net/ai-mystery-room`
    - `GEMINI_API_KEY`: `<your_gemini_api_key>`
-   - `CLIENT_ORIGIN`: `https://ai-mystery-room-sqai.vercel.app`
+   - `CLIENT_ORIGIN`: `https://ai-mystery-room-8aof.vercel.app`
    - `SESSION_SECRET`: `<32_character_random_string>`
 4. Deploy!
 
